@@ -1,0 +1,498 @@
+264  マイナビ × SIGNATE Student Cup 2019: 賃貸物件の家賃予測
+
+＜train＞
+ 0   id      31470 non-null  int64 
+ 1   賃料      31470 non-null  int64 
+ 2   アクセス    31470 non-null  object
+ 3   間取り     31470 non-null  object
+ 4   築年数     31470 non-null  object
+ 5   方角      28721 non-null  object
+ 6   面積      31470 non-null  object
+ 7   所在階     31470 non-null  object
+ 8   バス・トイレ  31141 non-null  object
+ 9   キッチン    30849 non-null  object
+ 10  放送・通信   28030 non-null  object
+ 11  室内設備    31388 non-null  object
+ 12  駐車場     26183 non-null  object
+ 13  周辺環境    22038 non-null  object
+ 14  建物構造    31470 non-null  object
+ 15  契約期間    24350 non-null  object
+ 16  ward    31470 non-null  object
+
+
+賃料,アクセス,間取り,築年数,面積,所在階,建物構造,区(ward)
+
+
+＜test＞
+ 0   id      31262 non-null  int64 
+ 1   所在地     31262 non-null  object
+ 2   アクセス    31262 non-null  object
+ 3   間取り     31262 non-null  object
+ 4   築年数     31262 non-null  object
+ 5   方角      28454 non-null  object
+ 6   面積      31262 non-null  object
+ 7   所在階     31261 non-null  object
+ 8   バス・トイレ  30942 non-null  object
+ 9   キッチン    30627 non-null  object
+ 10  放送・通信   27808 non-null  object
+ 11  室内設備    31189 non-null  object
+ 12  駐車場     25906 non-null  object
+ 13  周辺環境    22021 non-null  object
+ 14  建物構造    31262 non-null  object
+ 15  契約期間    24281 non-null  object
+
+アクセス,間取り,築年数,面積,建物構造,区(ward)
+
+所在階は1個だけ抜けがある　→　とりあえず最頻値で補完
+
+
+とりあえず以下の項目は抜けがない(あっても1個)ので、一回これでやってみる
+アクセス,間取り,築年数,面積,所在階,建物構造,区(ward)
+
+○前処理
+　・所在地　→　ward
+　　とりあえず何区かだけを抜き出す
+　　　→　
+　・アクセス　→　min_walk
+　　路線とかも取ろうとしたけど、形式違うのが多すぎて断念。最寄り駅までの最短時間だけ取得して使ってみる
+　・間取り
+　　部屋数は数値を取り出して、残りはRLDKSに該当するなら1を立てる
+　・築年数
+　　年と月の数値だけ取り出す
+　・面積
+　　数値だけ取り出す
+　・所属階
+　　1階／2階建だったら1/2で計算して0.5にする
+　・建物構造
+　　train側をベースにワンホットエンコーディングを実施
+
+○学習
+　・モデル候補
+　　ランダムフォレスト回帰（Random Forest Regressor）
+　　　結果　(素直にtrain_test_split)
+　　　　RMSE: 34887.231939351695
+　　　結果　(クロスバリデーション)
+　　　　RMSE: 39230.68536483007
+　　　結果　(クロスバリデーション+パラメータ調整)
+　　　　RMSE: 36083.80493425021
+　　XGBoost(勾配ブースティング回帰（Gradient Boosting Regressor）)
+　　　結果　(素直にtrain_test_split)　
+　　　　RMSE: 38458.499734563826
+　　　結果　(クロスバリデーション)
+　　　　RMSE: 35420.00120986017
+　　　結果　(クロスバリデーション+パラメータ調整)
+　　　　RMSE: 32609.2201604165
+　　LightGBM(勾配ブースティング回帰（Gradient Boosting Regressor）)
+　　　結果　(素直にtrain_test_split)
+　　　　RMSE: 35907.40256228185
+　　　結果　(クロスバリデーション)
+　　　　RMSE: 35907.40256228185
+　　　結果　(クロスバリデーション+パラメータ調整)
+　　　　RMSE: 36773.56405005034
+
+　・モデル仮決定(XGBoost)
+　　初回のパラメータ候補
+　　　param_grid = {
+	    'n_estimators': [10, 100, 300],
+	    'max_depth': [2, 5, 10],
+	    'learning_rate': [0.001, 0.01, 0.1],
+	    'subsample': [0.6, 0.8, 1.0],
+	    'colsample_bytree': [0.6, 0.8, 1.0]
+	}
+　　初回のベストパラメータ
+　　　'colsample_bytree': 0.6, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 300, 'subsample': 1.0
+　　結果
+　　　RMSE: 32609.2201604165
+　　2回目
+　　　param_grid = {
+	    'n_estimators': [10, 100, 300],
+	    'max_depth': [3, 4, 5],
+	    'learning_rate': [0.01, 0.02, 0.03],
+	    'subsample': [0.6, 0.8, 1.0],
+	    'colsample_bytree': [0.6, 0.8, 1.0],
+	    'min_child_weight': [5, 10, 20],
+	    'gamma': [0, 0.1, 0.2, 1, 5]
+	}
+　　　Best parameters found:  {'colsample_bytree': 0.8, 'gamma': 0, 'learning_rate': 0.03, 'max_depth': 5, 'min_child_weight': 10, 'n_estimators': 300, 'subsample': 0.8}
+　　　RMSE: 35725.85073360396
+　　3回目
+　　　xgb_model = xgb.XGBRegressor(
+	    objective='reg:squarederror',
+	    random_state=42,
+	    n_jobs=-1,
+	    learning_rate=0.01,  # 小さい学習率
+	    n_estimators=1000,   # もっと多くのエポック
+	    max_depth=5,         # 深さを制限
+	    min_child_weight=10,  # 最小サンプル数
+	    gamma=0.1            # 最小損失減少
+	)
+　　　RMSE: 35540.8156090588
+　　4回目
+　　　xgb_model = xgb.XGBRegressor(
+	    objective='reg:squarederror',
+	    random_state=42,
+	    n_jobs=-1,
+	    colsample_bytree=0.8,
+	    subsample=0.8,
+	　　learning_rate=0.01,  # 小さい学習率
+	    n_estimators=1000,   # もっと多くのエポック
+	    max_depth=5,         # 深さを制限
+	    min_child_weight=10  # 最小サンプル数
+	)
+　　　RMSE: 35388.96653695243
+　　5回目
+　　　xgb_model = xgb.XGBRegressor(
+	    objective='reg:squarederror',
+	    random_state=42,
+	    n_jobs=-1,
+	    colsample_bytree=0.6,
+	    subsample=1.0,
+	    learning_rate=0.1,
+	    n_estimators=1000,
+	    max_depth=10,
+	    min_child_weight=10
+	)
+　　　RMSE: 33478.91561409708
+
+～前処理のやり方変更後(ワンホットエンコーディングを単純な数値変換に変更)～
+1回目
+param_grid = {
+    'n_estimators': [10, 100, 300],
+    'max_depth': [2, 5, 10],
+    'learning_rate': [0.001, 0.01, 0.1],
+    'subsample': [0.6, 0.8, 1.0],
+    'colsample_bytree': [0.6, 0.8, 1.0]
+}
+Best parameters found:  {'colsample_bytree': 1.0, 'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 300, 'subsample': 0.8}
+RMSE: 36897.18547300125
+
+○前処理の変更
+　・所在地
+　　とりあえず何区かだけを抜き出して単純な数値変換
+　・アクセス
+　　最寄り駅までの最短時間だけ取得
+　　　→　0～9、10～19、20～で3つに分類する
+　・間取り
+　　単純な数値変換
+　　　→　1000以下をオーバーサンプリング
+　・築年数
+　　何年かに変換して数値だけ取り出す(1年6ヶ月は1.5)
+　　　→　外れ値(たぶん入力ミス)もあるし、30年以上は削除する
+　・建物構造
+　　単純な数値変換
+
+○XGBoost
+1回目(一番シンプルな方法)
+前回
+RMSE: 38458.499734563826
+今回
+RMSE: 37526.667934478755
+
+2回目(クロスバリデーションだけ使う)
+前回
+Cross-validation RMSE scores: [41989.58625939 35170.55622469 41140.4239257  38551.38616352
+ 49516.61391062]
+Mean RMSE: 41273.7132967843
+Test RMSE: 35420.00120986017
+今回
+Cross-validation RMSE scores: [33687.20483444 31246.96134532 27572.93854194 37300.06112644
+ 44323.36318175]
+Mean RMSE: 34826.10580597515
+Test RMSE: 34992.39381202964
+
+3回目(クロスバリデーション+グリッドサーチ)
+前回
+Best parameters found:  {'colsample_bytree': 1.0, 'learning_rate': 0.1, 'max_depth': 5, 'n_estimators': 300, 'subsample': 0.8}
+Test RMSE: 36897.18547300125
+今回
+Best parameters found:  {'colsample_bytree': 0.8, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 100, 'subsample': 1.0}
+Test RMSE: 34530.562526316746
+
+4回目(クロスバリデーション+グリッドサーチ+パラメータ追加+アーリーストッピング)
+前回
+Best parameters found:  {'colsample_bytree': 0.8, 'gamma': 0, 'learning_rate': 0.03, 'max_depth': 5, 'min_child_weight': 10, 'n_estimators': 300, 'subsample': 0.8}
+Test RMSE: 35725.85073360396
+今回
+Best parameters found:  {'colsample_bytree': 1.0, 'gamma': 0, 'learning_rate': 0.03, 'max_depth': 5, 'min_child_weight': 5, 'n_estimators': 300, 'subsample': 0.8}
+Test RMSE: 38224.57101470151
+
+5回目(XGBoostのパラメータ固定)
+前回
+Test RMSE: 33478.91561409708
+今回
+Test RMSE: 35878.73527425131
+
+○前処理の変更
+　・所在地
+　　とりあえず何区かだけを抜き出して単純な数値変換　→　変更なし
+　・アクセス
+　　最寄り駅までの最短時間だけ取得
+　　　→　0～9、10～19、20～で3つに分類する　→　変更なし
+　・間取り
+　　単純な数値変換
+　　　→　1000以下をオーバーサンプリング　→　変更なし
+　・築年数
+　　何年かに変換して数値だけ取り出す(1年6ヶ月は1.5)
+　　　→　外れ値(たぶん入力ミス)もあるし、30年以上は削除する　→　変更なし
+　・建物構造
+　　単純な数値変換　→　変更なし
+　・方角
+　　南を含む向きかどうかだけ南フラグとして引っ張ってくる
+　・所在階
+　　最上階かだけ最上階フラグとして引っ張ってくる
+○XGBoost
+1回目(クロスバリデーション+グリッドサーチ)
+前回
+Best parameters found:  {'colsample_bytree': 0.8, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 100, 'subsample': 1.0}
+Test RMSE: 34530.562526316746
+今回
+Best parameters found:  {'colsample_bytree': 0.8, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 100, 'subsample': 1.0}
+Test RMSE: 34526.350507183786
+
+○前処理の変更
+　・所在地
+　　とりあえず何区かだけを抜き出して単純な数値変換
+　　　→　緯度と経度に変換。なぜか変換できなかったのは同じ区の平均値で補完。所在地列は削除
+　・アクセス
+　　最寄り駅までの最短時間だけ取得
+　　　→　0～9、10～19、20～で3つに分類する　→　変更なし
+　・間取り
+　　単純な数値変換
+　　　→　1000以下をオーバーサンプリング　→　変更なし
+　・築年数
+　　何年かに変換して数値だけ取り出す(1年6ヶ月は1.5)
+　　　→　外れ値(たぶん入力ミス)もあるし、30年以上は削除する
+　　　　→　～10・～20・～30・～40・～50・50～で分類
+　・建物構造
+　　単純な数値変換　→　似てる区分は一纏めに
+　・方角
+　　南を含む向きかどうかだけ南フラグとして引っ張ってくる
+　・所在階
+　　最上階かだけ最上階フラグとして引っ張ってくる
+
+○XGBoost
+1回目(クロスバリデーション+グリッドサーチ)
+前回
+Best parameters found:  {'colsample_bytree': 0.8, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 100, 'subsample': 1.0}
+Test RMSE: 34526.350507183786
+今回
+Best parameters found:  {'colsample_bytree': 0.6, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 300, 'subsample': 1.0}
+Test RMSE: 37299.1939624676
+2回目(0～1で正規化)
+Best parameters found:  {'colsample_bytree': 0.6, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 300, 'subsample': 1.0}
+Test RMSE: 37299.10634653384
+2回目(0～1で正規化+緯度と経度の小数点第2位以下を丸め)
+Best parameters found:  {'colsample_bytree': 0.8, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 100, 'subsample': 1.0}
+Test RMSE: 38451.07739630489
+3回目(間取り以外にもオーバーサンプリングを実施)
+Best parameters found:  {'colsample_bytree': 1.0, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 300, 'subsample': 0.8}
+Test RMSE: 7252.6598880646425
+投稿時間：2024-10-08 14:04:07
+暫定評価：38080.41418562635
+4回目(0～1で正規化+緯度と経度の小数点第2位以下を丸め+オーバーサンプリングなし)
+Best parameters found:  {'colsample_bytree': 1.0, 'learning_rate': 0.01, 'max_depth': 10, 'n_estimators': 300, 'subsample': 0.6}
+Test RMSE: 42095.0216317115
+投稿時間：2024-10-08 14:21:37
+暫定評価：37103.43456953688
+5回目(0～1で正規化+緯度と経度の小数点第2位以下を丸め+全部にオーバー/アンダーサンプリング)
+Best parameters found:  {'colsample_bytree': 0.8, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 300, 'subsample': 0.6}
+Test RMSE: 1488.2134086915794
+投稿時間：2024-10-09 05:43:36
+暫定評価：45914.8919036209
+
+6回目(5回目にアーリーストッピングを追加)
+Best parameters found:  {'colsample_bytree': 0.8, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 300, 'subsample': 0.6}
+Test RMSE: 1489.6184935829708
+7回目(5回目をクロスバリデーションに変更+パラメータは5回目の最適値)
+Cross-validation RMSE scores: [75201.48911531   187.80886185  7521.50502056 23539.76310957
+ 54985.64117796]
+Mean RMSE: 32287.241457049553
+
+
+8回目(6回目でグリッドサーチからBayesian Optimizationに変更)
+Best parameters found:  {'target': -2135.061420925121, 'params': {'colsample_bytree': 0.967108158768331, 'learning_rate': 0.1, 'max_depth': 8.047845488013182, 'n_estimators': 182.32952026568617, 'subsample': 0.6}}
+Test RMSE: 2135.061420925121
+
+9回目(特徴量の重要度を確認して色々と調整+Bayesian Optimization)
+Best parameters found:  {'target': -8881.197548431473, 'params': {'colsample_bytree': 0.7778503288421091, 'learning_rate': 0.1, 'max_depth': 7.511734900094159, 'n_estimators': 183.38250988982438, 'subsample': 0.6}}
+Test RMSE: 8881.197548431473
+投稿時間：2024-10-09 05:46:52
+暫定評価：48900.02717677409
+
+10回目(5回目をクロスバリデーションに変更+パラメータは5回目の最適値)
+Cross-validation RMSE scores: [12634.2395529   7572.57443233  6865.17718653 28816.59498029
+ 81877.23343141]
+Mean RMSE: 27553.163916690995
+投稿時間：2024-10-09 06:06:10
+暫定評価：41691.26460720914
+
+
+--------------------------------------------------------------------------------------------------------------
+<RandomForestRegressor>
+RMSE: 21379.491060281624
+投稿時間：2024-10-15 16:48:04
+暫定評価：23266.22539699345
+
+<LGBMRegressor>
+RMSE: 22797.19620700304
+投稿時間：2024-10-15 16:50:18
+暫定評価：23762.14126696493
+
+<XGBRegressor>
+RMSE: 23917.961568084134(一番最初の素の状態)
+投稿時間：2024-10-15 16:49:55
+暫定評価：22669.88056240232
+544位
+RMSE: 23917.961568084134(クロスバリデーションだけ)
+RMSE: 21723.4925803779(グリッドサーチ)
+param_grid = {
+    'n_estimators': [10, 100, 300],
+    'max_depth': [2, 5, 10],
+    'learning_rate': [0.001, 0.01, 0.1],
+    'subsample': [0.6, 0.8, 1.0],
+    'colsample_bytree': [0.6, 0.8, 1.0]
+}
+Best parameters found:  {'colsample_bytree': 0.6, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 300, 'subsample': 1.0}
+コメント：過学習が気になる
+
+RMSE: 22637.69070678173
+param_grid = {
+    'n_estimators': [10, 25, 50],
+    'max_depth': [5, 7, 10],
+    'learning_rate': [0.1],
+    'subsample': [1.0],
+    'colsample_bytree': [0.2, 0.4, 0.6]
+}
+Best parameters found:  {'colsample_bytree': 0.6, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 50, 'subsample': 1.0}
+コメント：エポックは25くらいでよさそう
+
+
+
+～前処理で色々と特徴量を増やした～
+<RandomForestRegressor>
+RMSE: 20304.159651051847
+<LGBMRegressor>
+※なぜか評価がうまくいかない
+<XGBRegressor>
+RMSE: 21292.51882338108(一番最初の素の状態)
+
+RMSE: 21292.51882338108(クロスバリデーションだけ)
+
+(グリッドサーチ)
+param_grid = {
+    'n_estimators': [10, 100, 300],
+    'max_depth': [2, 5, 10],
+    'learning_rate': [0.001, 0.01, 0.1],
+    'subsample': [0.6, 0.8, 1.0],
+    'colsample_bytree': [0.6, 0.8, 1.0]
+}
+Best parameters found:  {'colsample_bytree': 1.0, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 300, 'subsample': 0.8}
+RMSE: 19439.16829842506
+投稿時間：2024-10-22 13:12:38
+暫定評価：21930.65258940529
+
+param_grid = {
+    'n_estimators': [5, 25, 50],
+    'max_depth': [10],
+    'learning_rate': [0.1],
+    'subsample': [0.7, 0.8, 0.9],
+    'colsample_bytree': [1.0]
+}
+Best parameters found:  {'colsample_bytree': 1.0, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 50, 'subsample': 0.7}
+RMSE: 20414.508217885457
+投稿時間：2024-10-22 13:11:28
+暫定評価：22825.65212951255
+
+～面積辺りの賃料を目的変数にしてみる～
+<XGBRegressor>(グリッドサーチ)
+param_grid = {
+    'n_estimators': [10, 100, 300],
+    'max_depth': [2, 5, 10],
+    'learning_rate': [0.001, 0.01, 0.1],
+    'subsample': [0.6, 0.8, 1.0],
+    'colsample_bytree': [0.6, 0.8, 1.0]
+}
+Best parameters found:  {'colsample_bytree': 0.6, 'learning_rate': 0.1, 'max_depth': 10, 'n_estimators': 300, 'subsample': 0.8}
+RMSE: 321.9437481998808
+投稿時間：2024-10-22 16:07:20
+暫定評価：16502.16382104317
+184位
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

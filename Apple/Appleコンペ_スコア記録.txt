@@ -1,0 +1,100 @@
+1.4375607916338178
+1.1757715907576771
+1.4166020894611422
+1.618770506799337
+0.802234197163782
+0.8051284785853549
+1.6261195324896753
+0.27188877551020413
+1.2444938775510206
+0.31482916666666666
+
+
+15.7803524
+16.8772603
+15.5395473
+15.6995909
+15.96078394123607
+15.362382852077
+15.362382852077
+24.81563829787234
+26.33898936170213
+19.68965425531915
+
+
+・曜日を追加してみる　○
+・(世間が)休日かどうかも追加してみる　？
+・datetimeで年/月/日それぞれで認識できるから分割してみる　◎
+・決定木モデルも使ってみる　XGBOOSTが一番っぽいかな？
+　XGBOOST ◎
+　LightGBM（欠損値は平均で埋めて計算してくれる）　△
+　CatBoost（GPUで計算してくれる)　○
+・最後の一押しでハイパーパラメータの調整をしてみる　△（いまいち効果がなかった…やり方悪い？)
+・clientは分けてモデル作るのもあり　○
+・close=1(休日フラグがオン)なのにyが0じゃない箇所をclose=0にする　△（微妙に評価下がった）
+
+・過学習してるかもしれないのでKFoldで確認してみる
+・してたら5分割それぞれの予測の平均値を取ったりしてみる
+　→　しても微妙だったときは
+　　　　クロスバリデーションの数を変える
+　　　　モデル自体を増やす（XGBOOSTの5個だけでなくLightGBMの5個も追加してみたりする）
+・休日フラグが立ってるデータを抜いた上で予測の休日フラグオンは０にする
+
+
+・どこかで区切りつけたところでQIITAにまとめてみる
+
+signate submit --competition-id=269 /home/whitesalena/python/pytorch/programs/Competition/Apple/inference.csv
+
+<LightGBM>
+Mean Absolute Error(client): 0.5484541638019056
+Mean Absolute Error: 2.5935448934229335
+Mean Absolute Error(client): 0.39301065783916156
+Mean Absolute Error: 2.386706808137578
+Mean Absolute Error(client): 0.39301065783916156
+Mean Absolute Error: 2.217518582856205
+SIGNATE：28.24516676819571
+
+<XGBoost>
+Mean Absolute Error(client): 0.014681003964136517
+Mean Absolute Error: 4.708589513862834
+Mean Absolute Error(client): 0.014681003964136517
+Mean Absolute Error: 4.881395842421289
+SIGNATE：14.24106871914894
+Mean Absolute Error(client): 0.014681003964136517
+Mean Absolute Error: 1.4909203313232637
+SIGNATE：14.80664171010638
+Mean Absolute Error(client): 0.002823307779100206
+Mean Absolute Error: 1.0117536674155032
+SIGNATE：10.22375459291489
+Mean Absolute Error(client): 0.002823307779100206
+Mean Absolute Error: 0.9994928477668003
+SIGNATE：11.3366184232234
+Mean absolute Error(client): 0.049630320639837355
+Mean absolute Error: 1.4249269447136013
+SIGNATE：11.08296810127128
+Mean absolute Error(client): 0.049630320639837355
+Mean absolute Error: 1.4147508771863637
+SIGNATE：10.38816593191489
+Mean absolute Error(client): 0.00028981897566053604
+Mean absolute Error: 0.8906253874933748
+SIGNATE：10.50285256292553
+Mean absolute Error(client): 0.00036566825140090214
+Mean absolute Error: 0.9451457808415095
+SIGNATE：11.92059944680851
+
+Mean Absolute Error(client): 0.0017667592366532845
+Mean Absolute Error: 0.513629942217469
+SIGNATE：11.0968406545355
+Mean Absolute Error(client): 0.02552527968088657
+Mean Absolute Error: 0.5149669599930448
+SIGNATE：11.46204163470167
+
+Mean Absolute Error(client): 0.005103503454299543
+Mean Absolute Error: 0.53742063004745
+SIGNATE：11.93792191870669
+
+
+<CatBoost>
+Mean Absolute Error(client): 0.3041135659794614
+Mean Absolute Error: 2.159878595704536
+SIGNATE：15.43419319634664

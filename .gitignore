@@ -216,3 +216,15 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# モデル
+*.pickle
+*.pkl
+*.joblib
+
+# データ
+*.csv
+*.tsv
+*.zip
+*.xml
+*.geojson
